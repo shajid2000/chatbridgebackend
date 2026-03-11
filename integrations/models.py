@@ -1,0 +1,54 @@
+import uuid
+from django.db import models
+from accounts.models import Business, User
+
+
+class ChannelType(models.Model):
+    """
+    Defines a supported messaging platform.
+    Managed via Django admin — no code change needed to update icons, labels, etc.
+    """
+    key = models.CharField(max_length=30, unique=True, help_text='e.g. whatsapp, instagram')
+    label = models.CharField(max_length=100, help_text='Display name e.g. WhatsApp')
+    icon = models.CharField(max_length=255, blank=True, help_text='Icon URL or CSS class')
+    color = models.CharField(max_length=20, blank=True, help_text='Brand color hex e.g. #25D366')
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True, help_text='Show this channel type in the UI')
+    supports_media = models.BooleanField(default=True)
+    supports_templates = models.BooleanField(default=False)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order', 'label']
+
+    def __str__(self):
+        return self.label
+
+
+class Channel(models.Model):
+    """A messaging platform connection belonging to a business."""
+
+    class Status(models.TextChoices):
+        ACTIVE = 'active', 'Active'
+        INACTIVE = 'inactive', 'Inactive'
+        ERROR = 'error', 'Error'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name='channels')
+    channel_type = models.ForeignKey(ChannelType, on_delete=models.PROTECT, related_name='channels')
+    name = models.CharField(max_length=100, help_text='Friendly label e.g. "Support WhatsApp"')
+    access_token = models.TextField(blank=True)
+    webhook_secret = models.CharField(max_length=255, blank=True)
+    # WhatsApp specific
+    phone_number_id = models.CharField(max_length=100, blank=True)
+    # Instagram / Messenger specific
+    page_id = models.CharField(max_length=100, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.INACTIVE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.name} ({self.channel_type.label}) — {self.business.name}'
