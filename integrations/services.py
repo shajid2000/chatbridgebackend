@@ -54,12 +54,15 @@ class MessageNormalizer:
         messages = []
         for entry in payload.get('entry', []):
             for change in entry.get('changes', []):
+                contact = change.get('value', {}).get('contacts', [{}])[0]
                 value = change.get('value', {})
                 for msg in value.get('messages', []):
                     messages.append({
                         'channel_type': 'whatsapp',
                         'external_id': msg.get('id'),
                         'sender_external_id': msg.get('from'),
+                        'phone': contact.get('wa_id', ''),
+                        'name': contact.get('profile', {}).get('name', ''),
                         'phone_number_id': value.get('metadata', {}).get('phone_number_id'),
                         'type': msg.get('type'),
                         'content': msg.get('text', {}).get('body', ''),

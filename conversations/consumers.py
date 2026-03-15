@@ -23,15 +23,17 @@ class CustomerConsumer(AsyncWebsocketConsumer):
 
         self.customer_id = self.scope['url_route']['kwargs']['customer_id']
 
+        await self.accept()
+
+        self.group_name = f'customer_{self.customer_id}'
+        await self.channel_layer.group_add(self.group_name, self.channel_name)
+
         # Verify customer belongs to the agent's business
         customer = await self.get_customer(self.customer_id, user.business_id)
         if not customer:
             await self.close(code=4004)
             return
-
-        self.group_name = f'customer_{self.customer_id}'
-        await self.channel_layer.group_add(self.group_name, self.channel_name)
-        await self.accept()
+        
         logger.info('WS connected: user=%s customer=%s', user.id, self.customer_id)
 
     async def disconnect(self, close_code):
@@ -149,9 +151,9 @@ class InboxConsumer(AsyncWebsocketConsumer):
             await self.close(code=4001)
             return
 
+        await self.accept()
         self.group_name = f'inbox_{user.business_id}'
         await self.channel_layer.group_add(self.group_name, self.channel_name)
-        await self.accept()
         logger.info('Inbox WS connected: user=%s business=%s', user.id, user.business_id)
 
     async def disconnect(self, close_code):

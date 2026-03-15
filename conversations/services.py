@@ -35,6 +35,8 @@ class MessageProcessor:
         channel_type = normalized['channel_type']
         sender_external_id = normalized['sender_external_id']
         external_id = normalized.get('external_id', '')
+        name = normalized.get('name', '')
+        phone = normalized.get('phone', '')
 
         # Skip duplicates
         if external_id and Message.objects.filter(external_id=external_id).exists():
@@ -48,6 +50,8 @@ class MessageProcessor:
             business=business,
             channel_type=channel_type,
             sender_external_id=sender_external_id,
+            name=name,
+            phone=phone,
         )
 
         # Update last seen channel
@@ -111,6 +115,8 @@ class MessageProcessor:
         business: Business,
         channel_type: str,
         sender_external_id: str,
+        name: str = '',
+        phone: str = '',
     ) -> Customer:
         """Find existing customer by platform identity or create a new one."""
         identity = CustomerChannel.objects.select_related('customer').filter(
@@ -120,10 +126,21 @@ class MessageProcessor:
         ).first()
 
         if identity:
+            if identity.customer.name != name or identity.customer.phone != phone:
+                identity.customer.name = name or identity.customer.name
+                identity.customer.phone = phone or identity.customer.phone
+                identity.customer.save(update_fields=['name', 'phone', 'updated_at'])
             return identity.customer
 
         # New customer
-        customer = Customer.objects.create(business=business)
+        new_cust_dic = {
+            'business': business,
+        }
+        if name:
+            new_cust_dic['name'] = name
+        if phone:
+            new_cust_dic['phone'] = phone
+        customer = Customer.objects.create(**new_cust_dic)
         CustomerChannel.objects.create(
             customer=customer,
             channel_type=channel_type,

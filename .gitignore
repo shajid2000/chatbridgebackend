@@ -3,6 +3,11 @@
 # Django
 
 # =========================
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
 
 *.log
 *.pot
