@@ -1,0 +1,131 @@
+# =========================
+
+# Django
+
+# =========================
+
+*.log
+*.pot
+*.pyc
+**pycache**/
+db.sqlite3
+media/
+staticfiles/
+local_settings.py
+
+# =========================
+
+# Environment Variables
+
+# =========================
+
+.env
+.env.*
+!.env.example
+
+# =========================
+
+# Python
+
+# =========================
+
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# =========================
+
+# Virtual Environment
+
+# =========================
+
+venv/
+env/
+ENV/
+.venv/
+
+# =========================
+
+# Django migrations cache
+
+# =========================
+
+*.sqlite3
+*.sqlite3-journal
+
+# =========================
+
+# Static / Media (optional)
+
+# =========================
+
+/static/
+/media/
+
+# =========================
+
+# VS Code
+
+# =========================
+
+.vscode/
+
+# =========================
+
+# OS Files
+
+# =========================
+
+.DS_Store
+Thumbs.db
+
+# =========================
+
+# Node (React / Next.js)
+
+# =========================
+
+node_modules/
+.next/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+
+# Testing / Coverage
+
+# =========================
+
+htmlcov/
+.coverage
+.coverage.*
+.cache
+pytest_cache/
+
+# =========================
+
+# Docker
+
+# =========================
+
+*.pid
+*.seed
+*.pid.lock
+docker-compose.override.yml
