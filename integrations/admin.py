@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import ChannelType, Channel
+from .models import ChannelType, Channel,SourceConnection
 
 
 @admin.register(ChannelType)
@@ -16,3 +16,6 @@ class ChannelAdmin(admin.ModelAdmin):
     list_filter = ['status', 'channel_type', 'business']
     search_fields = ['name', 'business__name']
     readonly_fields = ['id', 'created_at', 'updated_at']
+
+
+admin.site.register(SourceConnection)

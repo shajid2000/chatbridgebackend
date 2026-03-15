@@ -11,9 +11,11 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from accounts.permissions import IsBusinessAdmin, IsBusiness
-from .models import Channel, ChannelType
-from .serializers import ChannelSerializer, ChannelTypeSerializer
+from .models import Channel, ChannelType, SourceConnection
+from .serializers import ChannelSerializer, ChannelTypeSerializer, SourceConnectionSerializer
 from .services import ChannelService, WebhookVerifier, MessageNormalizer
+from . import source_service as meta
+from .connectors import ConnectorFactory
 
 logger = logging.getLogger(__name__)
 
@@ -169,3 +171,121 @@ class MetaWebhookView(APIView):
                 MessageProcessor.process(message)
             except Exception as e:
                 logger.exception('Failed to process message %s: %s', message.get('external_id'), e)
+
+
+# ─────────────────────────────────────────
+# Source Connection — OAuth connect flow
+# ─────────────────────────────────────────
+
+class SourceConnectionListView(generics.ListAPIView):
+    """GET /api/sources/ — list all source connections for the business."""
+    permission_classes = [IsAuthenticated, IsBusinessAdmin]
+    serializer_class   = SourceConnectionSerializer
+
+    def get_queryset(self):
+        return SourceConnection.objects.filter(business=self.request.user.business)
+
+
+class SourceConnectView(APIView):
+    """
+    POST /api/sources/connect/
+
+    Phase A — no auth_code in body:
+        Returns { login_url } for the frontend to open as a popup.
+
+    Phase B — auth_code (full redirect URL) present:
+        Exchanges code, discovers assets, persists SourceConnection + Channel.
+        Returns serialized SourceConnection. May also include facebook_pages
+        or phone_numbers for user selection.
+    """
+    permission_classes = [IsAuthenticated, IsBusinessAdmin]
+
+    def post(self, request):
+        source        = request.data.get('source', '')
+        auth_code_url = request.data.get('auth_code', '')
+
+        try:
+            connector = ConnectorFactory.get(source)
+        except KeyError:
+            return Response(
+                {'detail': f'Unsupported source "{source}". Supported: {ConnectorFactory.supported_sources()}'},
+                status=400,
+            )
+
+        # Phase A — return consent URL
+        if not auth_code_url:
+            url = connector.get_login_url(state=str(request.user.business.id))
+            return Response({'login_url': url})
+
+        # Phase B — finalize
+        return connector.finalize(request, auth_code_url)
+
+
+class SourceAssignView(APIView):
+    """
+    PATCH /api/sources/connect/
+
+    Assign a selected page / phone number to the business after a multi-choice
+    response from Phase B. Body example:
+
+    {
+      "source": "facebook.com",
+      "properties": [
+        { "item": { "page_id": "...", "page_name": "...", "page_token": "..." } }
+      ]
+    }
+    """
+    permission_classes = [IsAuthenticated, IsBusinessAdmin]
+
+    def patch(self, request):
+        source     = request.data.get('source', '')
+        properties = request.data.get('properties', [])
+        business   = request.user.business
+
+        if not source or not properties:
+            return Response({'detail': '"source" and "properties" are required.'}, status=400)
+
+        try:
+            connector = ConnectorFactory.get(source)
+        except KeyError:
+            return Response({'detail': f'Unsupported source "{source}".'}, status=400)
+
+        try:
+            connection = SourceConnection.objects.get(business=business, source=source)
+        except SourceConnection.DoesNotExist:
+            return Response(
+                {'detail': 'No existing source connection. Complete Phase B connect first.'},
+                status=404,
+            )
+
+        results = []
+        for prop in properties:
+            resp = connector.assign(request, connection, item=prop.get('item', {}))
+            results.append(resp.data)
+
+        return Response(results)
+
+
+class SourceDisconnectView(APIView):
+    """
+    DELETE /api/sources/connect/<uuid:pk>/
+
+    Revokes tokens, deactivates Channel, deletes SourceConnection.
+    """
+    permission_classes = [IsAuthenticated, IsBusinessAdmin]
+
+    def delete(self, request, pk):
+        try:
+            connection = SourceConnection.objects.get(pk=pk, business=request.user.business)
+        except SourceConnection.DoesNotExist:
+            return Response({'detail': 'Source connection not found.'}, status=404)
+
+        try:
+            connector = ConnectorFactory.get(connection.source)
+        except KeyError:
+            logger.warning('No connector for source %s during disconnect', connection.source)
+            connection.delete()
+            return Response({'detail': 'Disconnected (no connector found for cleanup).'})
+
+        connector.disconnect(connection)
+        return Response({'detail': 'Source disconnected successfully.'})

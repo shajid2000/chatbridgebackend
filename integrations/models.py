@@ -52,3 +52,48 @@ class Channel(models.Model):
 
     def __str__(self):
         return f'{self.name} ({self.channel_type.label}) — {self.business.name}'
+
+
+class SourceConnection(models.Model):
+    """
+    OAuth-based connection to a Meta messaging source (Messenger or WhatsApp).
+    One connection per business per source. Stores all Meta tokens and business metadata.
+    After connection is finalized this syncs into the Channel model for webhook routing.
+    """
+
+    class SourceType(models.TextChoices):
+        MESSENGER = 'facebook.com', 'Facebook Messenger'
+        WHATSAPP  = 'whatsapp',     'WhatsApp Business'
+
+    id       = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name='source_connections')
+    user     = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='source_connections')
+    source   = models.CharField(max_length=20, choices=SourceType.choices)
+
+    # OAuth token (user-level)
+    access_token = models.TextField(blank=True)
+
+    # Messenger-specific
+    page_name  = models.CharField(max_length=255, blank=True)
+    page_id    = models.CharField(max_length=100, blank=True)
+    page_token = models.TextField(blank=True)
+
+    # WhatsApp-specific
+    waba_id   = models.CharField(max_length=100, blank=True)
+    waba_name = models.CharField(max_length=255, blank=True)
+
+    # Business metadata (both)
+    business_manager_id          = models.CharField(max_length=100, blank=True)
+    business_manager_name        = models.CharField(max_length=255, blank=True)
+    business_approved_status     = models.CharField(max_length=50,  blank=True)
+    business_verification_status = models.CharField(max_length=50,  blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [('business', 'source')]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.get_source_display()} — {self.business.name}'

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Channel, ChannelType
+from .models import Channel, ChannelType, SourceConnection
 
 
 class ChannelTypeSerializer(serializers.ModelSerializer):
@@ -36,3 +36,30 @@ class ChannelStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = Channel
         fields = ['status']
+
+
+class SourceConnectionSerializer(serializers.ModelSerializer):
+    source_display = serializers.CharField(source='get_source_display', read_only=True)
+    connected_by   = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SourceConnection
+        fields = [
+            'id', 'source', 'source_display',
+            # Messenger
+            'page_id', 'page_name',
+            # WhatsApp
+            'waba_id', 'waba_name',
+            # Business metadata
+            'business_manager_id', 'business_manager_name',
+            'business_approved_status', 'business_verification_status',
+            # Meta
+            'connected_by', 'created_at', 'updated_at',
+        ]
+        read_only_fields = fields
+        # access_token and page_token are never returned
+
+    def get_connected_by(self, obj):
+        if obj.user:
+            return {'id': str(obj.user.id), 'full_name': obj.user.full_name, 'email': obj.user.email}
+        return None
