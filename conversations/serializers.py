@@ -43,7 +43,7 @@ class MessageSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'speaker', 'speaker_agent', 'channel_type',
             'content_type', 'content', 'attachments',
-            'is_read', 'timestamp',
+            'is_read', 'send_error', 'timestamp',
         ]
         read_only_fields = ['id', 'timestamp']
 

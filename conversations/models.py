@@ -83,6 +83,7 @@ class Message(models.Model):
     attachments = models.JSONField(default=list, blank=True)
     raw_payload = models.JSONField(default=dict, blank=True)
     is_read = models.BooleanField(default=False)
+    send_error = models.TextField(blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:

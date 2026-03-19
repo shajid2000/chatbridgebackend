@@ -1,7 +1,9 @@
 import json
 import logging
+import uuid
 
 from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 
@@ -171,6 +173,17 @@ class MetaWebhookView(APIView):
                 MessageProcessor.process(message)
             except Exception as e:
                 logger.exception('Failed to process message %s: %s', message.get('external_id'), e)
+
+
+class RotateClientKeyView(APIView):
+    """POST /api/channels/<uuid:pk>/rotate-key/ — regenerate client_key for an app channel."""
+    permission_classes = [IsAuthenticated, IsBusinessAdmin]
+
+    def post(self, request, pk):
+        channel = get_object_or_404(Channel, pk=pk, business=request.user.business)
+        channel.client_key = uuid.uuid4()
+        channel.save(update_fields=['client_key', 'updated_at'])
+        return Response({'client_key': str(channel.client_key)})
 
 
 # ─────────────────────────────────────────

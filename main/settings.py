@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     'accounts',
     'integrations',
     'conversations',
+    'app_channel',
 ]
 
 MIDDLEWARE = [
@@ -52,6 +53,12 @@ CORS_ALLOWED_ORIGINS = config(
     default='http://localhost:3000'
 ).split(',')
 CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS', 
+    default='https://chatbridgebackend.onrender.com,https://chatbridgedashboard.vercel.app'
+).split(',')
+
 
 ROOT_URLCONF = 'main.urls'
 

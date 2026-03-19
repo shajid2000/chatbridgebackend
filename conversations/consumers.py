@@ -26,7 +26,12 @@ class CustomerConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
         self.group_name = f'customer_{self.customer_id}'
-        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        try:
+            await self.channel_layer.group_add(self.group_name, self.channel_name)
+        except Exception:
+            logger.exception('Chat WS: channel layer unavailable, closing')
+            await self.close(code=4500)
+            return
 
         # Verify customer belongs to the agent's business
         customer = await self.get_customer(self.customer_id, user.business_id)
@@ -59,10 +64,11 @@ class CustomerConsumer(AsyncWebsocketConsumer):
         try:
             message = await self.save_and_send(user, self.customer_id, content, channel_id)
         except ValueError as e:
+            # Pre-save error (e.g. no channel configured) — no message was created
             await self.send_error(str(e))
             return
 
-        # Broadcast to all agents in this customer group
+        # Broadcast to all agents in this customer group (even if send_error is set)
         await self.channel_layer.group_send(
             self.group_name,
             {
@@ -132,6 +138,7 @@ class CustomerConsumer(AsyncWebsocketConsumer):
             'content': message.content,
             'attachments': message.attachments,
             'is_read': message.is_read,
+            'send_error': message.send_error or None,
             'timestamp': message.timestamp.isoformat(),
         }
 
@@ -153,7 +160,12 @@ class InboxConsumer(AsyncWebsocketConsumer):
 
         await self.accept()
         self.group_name = f'inbox_{user.business_id}'
-        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        try:
+            await self.channel_layer.group_add(self.group_name, self.channel_name)
+        except Exception:
+            logger.exception('Inbox WS: channel layer unavailable, closing')
+            await self.close(code=4500)
+            return
         logger.info('Inbox WS connected: user=%s business=%s', user.id, user.business_id)
 
     async def disconnect(self, close_code):

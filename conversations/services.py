@@ -95,6 +95,7 @@ class MessageProcessor:
             'content': message.content,
             'attachments': message.attachments,
             'is_read': message.is_read,
+            'send_error': message.send_error or None,
             'timestamp': message.timestamp.isoformat(),
         }
 
@@ -225,4 +226,5 @@ class ReplyService:
                 'Adapter dispatch failed for message %s via %s: %s',
                 message.id, channel.channel_type.key, e,
             )
-            raise ValueError(f'Failed to deliver message via {channel.channel_type.label}: {e}')
+            message.send_error = f'Failed to deliver via {channel.channel_type.label}: {e}'
+            message.save(update_fields=['send_error'])

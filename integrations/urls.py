@@ -8,6 +8,7 @@ urlpatterns = [
     # Channel management (manual / legacy)
     path('channels/', views.ChannelListCreateView.as_view(), name='channel-list-create'),
     path('channels/<uuid:pk>/', views.ChannelDetailView.as_view(), name='channel-detail'),
+    path('channels/<uuid:pk>/rotate-key/', views.RotateClientKeyView.as_view(), name='channel-rotate-key'),
 
     # Webhooks
     path('webhooks/meta/', views.MetaWebhookView.as_view(), name='webhook-meta'),

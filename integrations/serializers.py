@@ -20,11 +20,11 @@ class ChannelSerializer(serializers.ModelSerializer):
     class Meta:
         model = Channel
         fields = [
-            'id', 'name', 'channel_type', 'channel_type_id',
+            'id', 'client_key', 'name', 'channel_type', 'channel_type_id',
             'access_token', 'webhook_secret', 'phone_number_id',
             'page_id', 'status', 'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'status', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'client_key', 'status', 'created_at', 'updated_at']
         extra_kwargs = {
             'access_token': {'write_only': True},
             'webhook_secret': {'write_only': True},

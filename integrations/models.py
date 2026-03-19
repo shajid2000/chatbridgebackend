@@ -46,6 +46,7 @@ class Channel(models.Model):
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.INACTIVE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    client_key = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
 
     class Meta:
         ordering = ['-created_at']

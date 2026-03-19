@@ -1,12 +1,14 @@
 from .whatsapp import WhatsappAdapter
 from .instagram import InstagramAdapter
 from .messenger import MessengerAdapter
+from .app import AppAdapter
 from .base import BaseChannelAdapter
 
 _ADAPTER_MAP = {
     'whatsapp': WhatsappAdapter,
     'instagram': InstagramAdapter,
     'messenger': MessengerAdapter,
+    'app': AppAdapter,
 }
 
 
