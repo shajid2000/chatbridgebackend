@@ -183,3 +183,11 @@ class InboxConsumer(AsyncWebsocketConsumer):
             'customer_id': event['customer_id'],
             'message': event['message'],
         }))
+
+    async def inbox_merged(self, event):
+        """Notify clients that secondary customers were merged into a primary."""
+        await self.send(text_data=json.dumps({
+            'type': 'customer_merged',
+            'primary_id': event['primary_id'],
+            'merged_ids': event['merged_ids'],
+        }))

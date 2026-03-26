@@ -30,6 +30,10 @@ class ChannelSerializer(serializers.ModelSerializer):
             'webhook_secret': {'write_only': True},
         }
 
+    def create(self, validated_data):
+        # client_key is generated automatically in the model's save() method
+        return super().create(validated_data)
+
 
 class ChannelStatusSerializer(serializers.ModelSerializer):
     """Lightweight serializer for status-only updates."""

@@ -13,4 +13,5 @@ urlpatterns = [
     # Actions
     path('customers/<uuid:customer_id>/assign/', views.AssignAgentView.as_view(), name='customer-assign'),
     path('customers/<uuid:customer_id>/status/', views.UpdateStatusView.as_view(), name='customer-status'),
+    path('customers/<uuid:customer_id>/merge/', views.MergeCustomerView.as_view(), name='customer-merge'),
 ]

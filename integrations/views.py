@@ -48,11 +48,6 @@ class ChannelListCreateView(generics.ListCreateAPIView):
         ).select_related('channel_type')
 
     def perform_create(self, serializer):
-        ChannelService.connect(
-            business=self.request.user.business,
-            validated_data=serializer.validated_data,
-        )
-        # Re-save via serializer to keep DRF response consistent
         serializer.save(business=self.request.user.business, status=Channel.Status.ACTIVE)
 
 
@@ -133,9 +128,9 @@ class MetaWebhookView(APIView):
                 channel = self._get_channel(phone_number_id=phone_number_id)
                 if not channel:
                     continue
-                # if not WebhookVerifier.verify_whatsapp(raw_body, signature, channel.webhook_secret):
-                #     logger.warning('Invalid WhatsApp signature for channel %s', channel.id)
-                #     continue
+                if not WebhookVerifier.verify_whatsapp(raw_body, signature, channel.webhook_secret):
+                    logger.warning('Invalid WhatsApp signature for channel %s', channel.id)
+                    continue
                 messages = MessageNormalizer.from_whatsapp(payload)
                 self._dispatch(messages, channel)
 

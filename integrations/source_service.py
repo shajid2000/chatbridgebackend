@@ -166,7 +166,7 @@ def get_waba_id(access_token: str) -> str | None:
 
 def subscribe_waba_to_app(waba_id: str):
     """Subscribe a WABA to the app's webhooks."""
-    admin_token = config('FACEBOOK_APP_ADMIN_TOKEN', default='')
+    admin_token = config('FACEBOOK_ADMIN_TOKEN', default='')
     resp = requests.post(
         f"{GRAPH}/{waba_id}/subscribed_apps",
         headers={'Authorization': f"Bearer {admin_token}"},
@@ -179,7 +179,7 @@ def subscribe_waba_to_app(waba_id: str):
 
 def unsubscribe_waba_from_app(waba_id: str):
     """Unsubscribe the app from a WABA's webhooks (called on disconnect)."""
-    admin_token = config('FACEBOOK_APP_ADMIN_TOKEN', default='')
+    admin_token = config('FACEBOOK_ADMIN_TOKEN', default='')
     resp = requests.delete(
         f"{GRAPH}/{waba_id}/subscribed_apps",
         headers={'Authorization': f"Bearer {admin_token}"},

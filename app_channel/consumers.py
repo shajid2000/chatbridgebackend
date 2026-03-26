@@ -55,21 +55,24 @@ class AppConsumer(AsyncWebsocketConsumer):
         if not content:
             return
 
-        message = await self.create_inbound_message(content)
-        if not message:
+        # Re-fetch token fresh — customer may have changed since connect() (e.g. after merge)
+        result = await self.create_inbound_message(content)
+        if not result:
             return
+
+        message, customer_id, business_id = result
 
         # Notify agents: chat window + inbox sidebar
         try:
             await self.channel_layer.group_send(
-                f'customer_{self.token_data["customer_id"]}',
+                f'customer_{customer_id}',
                 {'type': 'chat.message', 'message': message},
             )
             await self.channel_layer.group_send(
-                f'inbox_{self.token_data["business_id"]}',
+                f'inbox_{business_id}',
                 {
                     'type': 'inbox.update',
-                    'customer_id': self.token_data['customer_id'],
+                    'customer_id': customer_id,
                     'message': message,
                 },
             )
@@ -112,19 +115,23 @@ class AppConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def create_inbound_message(self, content):
-        from conversations.models import Customer, Message
-        from integrations.models import Channel
+        from .models import AppToken
+        from conversations.models import Message
 
         try:
-            customer = Customer.objects.get(id=self.token_data['customer_id'])
-            channel = Channel.objects.select_related('channel_type').get(
-                id=self.token_data['channel_id']
-            )
+            # Always re-fetch the token to get the current customer
+            # (customer FK may have changed after a merge)
+            app_token = AppToken.objects.select_related(
+                'customer', 'channel__channel_type', 'channel__business'
+            ).get(pk=self.token_data['pk'])
+
+            customer = app_token.customer
+            channel = app_token.channel
 
             message = Message.objects.create(
                 customer=customer,
                 speaker=Message.Speaker.CUSTOMER,
-                channel_type=self.token_data['channel_type'],
+                channel_type=channel.channel_type.key,
                 content_type=Message.ContentType.TEXT,
                 content=content,
             )
@@ -133,7 +140,7 @@ class AppConsumer(AsyncWebsocketConsumer):
             customer.last_message_at = timezone.now()
             customer.save(update_fields=['last_channel', 'last_message_at', 'updated_at'])
 
-            return {
+            msg_dict = {
                 'id': str(message.id),
                 'speaker': message.speaker,
                 'speaker_agent': None,
@@ -145,6 +152,7 @@ class AppConsumer(AsyncWebsocketConsumer):
                 'send_error': None,
                 'timestamp': message.timestamp.isoformat(),
             }
+            return msg_dict, str(customer.id), str(channel.business_id)
         except Exception as e:
             logger.exception('App WS: failed to save message: %s', e)
             return None

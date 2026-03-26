@@ -12,10 +12,10 @@ class ChannelTypeAdmin(admin.ModelAdmin):
 
 @admin.register(Channel)
 class ChannelAdmin(admin.ModelAdmin):
-    list_display = ['name', 'channel_type', 'business', 'status', 'created_at']
-    list_filter = ['status', 'channel_type', 'business']
-    search_fields = ['name', 'business__name']
-    readonly_fields = ['id', 'created_at', 'updated_at']
+    list_display = ['id', 'name', 'channel_type', 'business', 'status', 'client_key', 'created_at']
+    list_filter = ['status', 'channel_type', 'business', 'created_at']
+    search_fields = ['name', 'business__name', 'client_key']
+    readonly_fields = ['id', 'client_key', 'created_at', 'updated_at']
 
 
 admin.site.register(SourceConnection)

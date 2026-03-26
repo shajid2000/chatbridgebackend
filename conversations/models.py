@@ -1,5 +1,7 @@
 import uuid
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from accounts.models import Business, User
 from integrations.models import Channel
 
@@ -91,3 +93,12 @@ class Message(models.Model):
 
     def __str__(self):
         return f'[{self.speaker}] {self.content[:50]}'
+
+
+@receiver(post_save, sender=Customer)
+def set_guest_name(sender, instance, created, **kwargs):
+    """Assign a searchable Guest #<id> name to nameless customers on creation."""
+    if created and not instance.name:
+        Customer.objects.filter(pk=instance.pk).update(
+            name=f"Guest #{str(instance.id).replace('-', '')[:6]}"
+        )
