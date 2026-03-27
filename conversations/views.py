@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import CursorPagination, PageNumberPagination
-from django.db.models import Q
+from django.db.models import Q, F
 from django.db import transaction
 
 from accounts.models import User
@@ -38,7 +38,9 @@ class CustomerListView(generics.ListAPIView):
     def get_queryset(self):
         qs = Customer.objects.filter(
             business=self.request.user.business
-        ).select_related('last_channel__channel_type', 'assigned_agent').order_by('-last_message_at', '-created_at')
+        ).select_related('last_channel__channel_type', 'assigned_agent').order_by(
+            F('last_message_at').desc(nulls_last=True), '-created_at'
+        )
 
         status_filter = self.request.query_params.get('status')
         if status_filter:
