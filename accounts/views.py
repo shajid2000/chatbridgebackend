@@ -14,7 +14,7 @@ from .serializers import (
     InviteAcceptSerializer,
     InviteTokenSerializer,
 )
-from .permissions import IsBusinessAdmin, IsBusiness
+from .permissions import IsBusinessAdmin
 from .services import AccountService
 
 
@@ -71,7 +71,7 @@ class MeView(APIView):
 
 
 class InviteCreateView(APIView):
-    """Admin sends an invite to a new staff member."""
+    """Admin or superadmin sends an invite to a new staff member."""
     permission_classes = [IsAuthenticated, IsBusinessAdmin]
 
     def post(self, request):
@@ -124,7 +124,7 @@ class LogoutView(APIView):
 
 
 class TeamMembersView(generics.ListAPIView):
-    """List all users in the current business (admin only)."""
+    """List all users in the current business (admin or superadmin)."""
     permission_classes = [IsAuthenticated, IsBusinessAdmin]
     serializer_class = UserSerializer
 
@@ -132,3 +132,18 @@ class TeamMembersView(generics.ListAPIView):
         return User.objects.filter(
             business=self.request.user.business
         ).select_related('business').order_by('date_joined')
+
+
+class TeamMemberRemoveView(APIView):
+    """Remove a team member from the business (admin or superadmin)."""
+    permission_classes = [IsAuthenticated, IsBusinessAdmin]
+
+    def delete(self, request, pk):
+        try:
+            member = User.objects.get(pk=pk, business=request.user.business)
+        except User.DoesNotExist:
+            return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if member == request.user:
+            return Response({'detail': 'You cannot remove yourself.'}, status=status.HTTP_400_BAD_REQUEST)
+        member.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

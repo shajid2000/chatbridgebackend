@@ -227,6 +227,10 @@ class AppMessagesView(APIView):
         from conversations.services import MessageProcessor
         MessageProcessor._broadcast(customer, message)
 
+        # Trigger AI auto-reply in background
+        from conversations.ai_service import AIReplyService
+        AIReplyService.dispatch(customer)
+
         return Response(AppMessageSerializer(message).data, status=status.HTTP_201_CREATED)
 
 

@@ -23,6 +23,8 @@ class Customer(models.Model):
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_customers'
     )
     last_message_at = models.DateTimeField(null=True, blank=True)
+    # None = follow business AI setting, True = force on, False = opt-out
+    ai_enabled = models.BooleanField(null=True, blank=True, default=None)
     status = models.CharField(
         max_length=20,
         choices=[('open', 'Open'), ('resolved', 'Resolved'), ('pending', 'Pending')],

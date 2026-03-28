@@ -19,7 +19,7 @@ class CustomerSerializer(serializers.ModelSerializer):
         model = Customer
         fields = [
             'id', 'name', 'phone', 'email', 'avatar_url',
-            'status', 'last_channel_type', 'last_channel_id', 'assigned_agent',
+            'status', 'ai_enabled', 'last_channel_type', 'last_channel_id', 'assigned_agent',
             'channel_identities', 'last_message_at', 'created_at',
         ]
         read_only_fields = ['id', 'last_message_at', 'created_at']

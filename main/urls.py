@@ -10,4 +10,5 @@ urlpatterns = [
     path('api/', include('integrations.urls')),
     path('api/', include('conversations.urls')),
     path('api/', include('app_channel.urls')),
+    path('api/', include('ai_config.urls')),
 ]

@@ -74,6 +74,10 @@ class MessageProcessor:
         # Broadcast to agents viewing this customer thread + inbox sidebar
         MessageProcessor._broadcast(customer, message)
 
+        # Trigger AI auto-reply (runs in background, never blocks here)
+        from .ai_service import AIReplyService
+        AIReplyService.dispatch(customer)
+
         return message
 
     @staticmethod

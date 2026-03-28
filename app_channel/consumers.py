@@ -82,9 +82,25 @@ class AppConsumer(AsyncWebsocketConsumer):
         # Echo the saved message back to the sender
         await self.send(text_data=json.dumps({'type': 'message', 'message': message}))
 
+        # Trigger AI auto-reply in background
+        await self.dispatch_ai_reply(customer_id)
+
     async def app_message(self, event):
         """Agent/bot message pushed by AppAdapter — forward to app client."""
         await self.send(text_data=json.dumps({'type': 'message', 'message': event['message']}))
+
+    @database_sync_to_async
+    def dispatch_ai_reply(self, customer_id):
+        from conversations.ai_service import AIReplyService
+        from conversations.models import Customer
+        try:
+            customer = Customer.objects.only(
+                'id', 'business_id', 'ai_enabled', 'name', 'phone', 'email',
+                'last_channel_id',
+            ).select_related('business', 'last_channel__channel_type').get(id=customer_id)
+            AIReplyService.dispatch(customer)
+        except Exception:
+            logger.exception('App WS: failed to dispatch AI reply for customer %s', customer_id)
 
     # ── DB helpers ──────────────────────────────────────────────────────────
 

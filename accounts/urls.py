@@ -11,4 +11,5 @@ urlpatterns = [
     path('team/invite/', views.InviteCreateView.as_view(), name='invite-create'),
     path('team/invite/accept/', views.InviteAcceptView.as_view(), name='invite-accept'),
     path('team/members/', views.TeamMembersView.as_view(), name='team-members'),
+    path('team/members/<uuid:pk>/', views.TeamMemberRemoveView.as_view(), name='team-member-remove'),
 ]

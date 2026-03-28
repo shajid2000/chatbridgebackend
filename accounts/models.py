@@ -46,6 +46,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     """Custom user — belongs to a Business, has a role (admin or staff)."""
 
     class Role(models.TextChoices):
+        SUPERADMIN = 'superadmin', 'Super Admin'
         ADMIN = 'admin', 'Admin'
         STAFF = 'staff', 'Staff'
 

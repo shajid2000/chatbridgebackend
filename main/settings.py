@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'integrations',
     'conversations',
     'app_channel',
+    'ai_config',
 ]
 
 MIDDLEWARE = [
@@ -165,3 +166,10 @@ SIMPLE_JWT = {
     'UPDATE_LAST_LOGIN': True,
     'TOKEN_OBTAIN_SERIALIZER': 'rest_framework_simplejwt.serializers.TokenObtainPairSerializer',
 }
+
+# ───────────────────────────────────────────
+# AI Agent
+# ───────────────────────────────────────────
+# 'thread' = daemon thread, zero extra infra (default for Render free tier)
+# 'celery' = Celery task queue (switch when a worker is available)
+AI_ASYNC_BACKEND = config('AI_ASYNC_BACKEND', default='thread')
