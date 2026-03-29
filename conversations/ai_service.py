@@ -68,6 +68,8 @@ class AIReplyService:
         if not messages:
             return
 
+        AIReplyService._broadcast_typing(customer)
+
         try:
             from integrations.ai_providers.factory import get_ai_provider
             provider = get_ai_provider(ai_config)
@@ -164,6 +166,23 @@ class AIReplyService:
         ]
 
         return config, system_prompt, messages
+
+    @staticmethod
+    def _broadcast_typing(customer):
+        """Push a typing indicator to the customer's app widget while AI is thinking."""
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+
+        channel_layer = get_channel_layer()
+        if not channel_layer:
+            return
+        try:
+            async_to_sync(channel_layer.group_send)(
+                f'app_customer_{customer.id}',
+                {'type': 'app.typing', 'source': 'bot'},
+            )
+        except Exception:
+            logger.warning('AIReplyService: failed to send typing indicator for customer %s', customer.id)
 
     @staticmethod
     def _broadcast(customer, message):

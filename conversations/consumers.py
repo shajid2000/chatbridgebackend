@@ -46,12 +46,22 @@ class CustomerConsumer(AsyncWebsocketConsumer):
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
     async def receive(self, text_data):
-        """Agent sends a message via WebSocket."""
+        """Agent sends a message or typing event via WebSocket."""
         user = self.scope['user']
         try:
             data = json.loads(text_data)
         except json.JSONDecodeError:
             await self.send_error('Invalid JSON.')
+            return
+
+        if data.get('type') == 'typing':
+            try:
+                await self.channel_layer.group_send(
+                    f'app_customer_{self.customer_id}',
+                    {'type': 'app.typing'},
+                )
+            except Exception:
+                pass
             return
 
         content = data.get('content', '').strip()
@@ -93,6 +103,10 @@ class CustomerConsumer(AsyncWebsocketConsumer):
             'type': 'message',
             'message': event['message'],
         }))
+
+    async def chat_typing(self, event):
+        """Customer is typing — forward to dashboard agent."""
+        await self.send(text_data=json.dumps({'type': 'typing'}))
 
     async def send_error(self, detail):
         await self.send(text_data=json.dumps({'type': 'error', 'detail': detail}))

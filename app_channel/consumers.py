@@ -30,8 +30,10 @@ class AppConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
         self.group_name = f'app_{token}'
+        self.customer_group = f'app_customer_{self.token_data["customer_id"]}'
         try:
             await self.channel_layer.group_add(self.group_name, self.channel_name)
+            await self.channel_layer.group_add(self.customer_group, self.channel_name)
         except Exception:
             logger.exception('App WS: channel layer unavailable')
             await self.close(code=4500)
@@ -43,12 +45,25 @@ class AppConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         if hasattr(self, 'group_name'):
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
+        if hasattr(self, 'customer_group'):
+            await self.channel_layer.group_discard(self.customer_group, self.channel_name)
 
     async def receive(self, text_data):
-        """End-user sends a message."""
+        """End-user sends a message or typing event."""
         try:
             data = json.loads(text_data)
         except json.JSONDecodeError:
+            return
+
+        if data.get('type') == 'typing':
+            customer_id = self.token_data['customer_id']
+            try:
+                await self.channel_layer.group_send(
+                    f'customer_{customer_id}',
+                    {'type': 'chat.typing'},
+                )
+            except Exception:
+                pass
             return
 
         content = data.get('content', '').strip()
@@ -88,6 +103,13 @@ class AppConsumer(AsyncWebsocketConsumer):
     async def app_message(self, event):
         """Agent/bot message pushed by AppAdapter — forward to app client."""
         await self.send(text_data=json.dumps({'type': 'message', 'message': event['message']}))
+
+    async def app_typing(self, event):
+        """Agent/bot is typing — forward to app client."""
+        payload = {'type': 'typing'}
+        if event.get('source'):
+            payload['source'] = event['source']
+        await self.send(text_data=json.dumps(payload))
 
     @database_sync_to_async
     def dispatch_ai_reply(self, customer_id):
