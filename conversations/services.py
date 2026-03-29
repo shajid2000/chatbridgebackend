@@ -46,7 +46,7 @@ class MessageProcessor:
         business = Business.objects.get(id=business_id)
         channel = Channel.objects.get(id=channel_id)
 
-        customer = MessageProcessor._identify_customer(
+        customer, is_new = MessageProcessor._identify_customer(
             business=business,
             channel_type=channel_type,
             sender_external_id=sender_external_id,
@@ -72,7 +72,7 @@ class MessageProcessor:
         logger.info('Message stored: customer=%s channel=%s', customer.id, channel_type)
 
         # Broadcast to agents viewing this customer thread + inbox sidebar
-        MessageProcessor._broadcast(customer, message)
+        MessageProcessor._broadcast(customer, message, is_new=is_new)
 
         # Trigger AI auto-reply (runs in background, never blocks here)
         from .ai_service import AIReplyService
@@ -81,7 +81,7 @@ class MessageProcessor:
         return message
 
     @staticmethod
-    def _broadcast(customer, message):
+    def _broadcast(customer, message, is_new=False):
         """Push the new message to WebSocket groups via channel layer."""
         from asgiref.sync import async_to_sync
         from channels.layers import get_channel_layer
@@ -109,11 +109,21 @@ class MessageProcessor:
             {'type': 'chat.message', 'message': payload},
         )
 
-        # Notify the inbox sidebar
-        async_to_sync(channel_layer.group_send)(
-            f'inbox_{customer.business_id}',
-            {'type': 'inbox.update', 'customer_id': str(customer.id), 'message': payload},
-        )
+        if is_new:
+            # New customer — send full customer object so the sidebar can prepend it
+            from .serializers import CustomerSerializer
+            customer.refresh_from_db()  # pick up last_channel set just before this call
+            customer_data = CustomerSerializer(customer).data
+            async_to_sync(channel_layer.group_send)(
+                f'inbox_{customer.business_id}',
+                {'type': 'inbox.new_customer', 'customer': customer_data},
+            )
+        else:
+            # Existing customer — update their position/preview in the sidebar
+            async_to_sync(channel_layer.group_send)(
+                f'inbox_{customer.business_id}',
+                {'type': 'inbox.update', 'customer_id': str(customer.id), 'message': payload},
+            )
 
     @staticmethod
     def _identify_customer(
@@ -135,12 +145,10 @@ class MessageProcessor:
                 identity.customer.name = name or identity.customer.name
                 identity.customer.phone = phone or identity.customer.phone
                 identity.customer.save(update_fields=['name', 'phone', 'updated_at'])
-            return identity.customer
+            return identity.customer, False
 
         # New customer
-        new_cust_dic = {
-            'business': business,
-        }
+        new_cust_dic = {'business': business}
         if name:
             new_cust_dic['name'] = name
         if phone:
@@ -151,7 +159,7 @@ class MessageProcessor:
             channel_type=channel_type,
             external_id=sender_external_id,
         )
-        return customer
+        return customer, True
 
     @staticmethod
     def _map_content_type(platform_type: str) -> str:

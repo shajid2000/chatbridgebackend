@@ -198,6 +198,13 @@ class InboxConsumer(AsyncWebsocketConsumer):
             'message': event['message'],
         }))
 
+    async def inbox_new_customer(self, event):
+        """Notify clients that a brand-new customer has appeared."""
+        await self.send(text_data=json.dumps({
+            'type': 'new_customer',
+            'customer': event['customer'],
+        }))
+
     async def inbox_merged(self, event):
         """Notify clients that secondary customers were merged into a primary."""
         await self.send(text_data=json.dumps({
