@@ -94,7 +94,7 @@ class MetaWebhookView(APIView):
         """Receive and process incoming Meta webhook events."""
         raw_body = request.body
         signature = request.headers.get('X-Hub-Signature-256', '')
-
+        logger.info(f'sign - {signature},  raw - {raw_body}')
         try:
             payload = json.loads(raw_body)
         except json.JSONDecodeError:
