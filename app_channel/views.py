@@ -22,6 +22,25 @@ from .serializers import (
 logger = logging.getLogger(__name__)
 
 
+def _broadcast_new_customer(customer):
+    """Push a new_customer event to all agents' inbox sidebar."""
+    from asgiref.sync import async_to_sync
+    from channels.layers import get_channel_layer
+    from conversations.serializers import CustomerSerializer
+
+    channel_layer = get_channel_layer()
+    if not channel_layer:
+        return
+    try:
+        customer_data = CustomerSerializer(customer).data
+        async_to_sync(channel_layer.group_send)(
+            f'inbox_{customer.business_id}',
+            {'type': 'inbox.new_customer', 'customer': customer_data},
+        )
+    except Exception:
+        logger.exception('Failed to broadcast new_customer for customer %s', customer.id)
+
+
 class ChannelInfoView(APIView):
     """
     GET /api/app/channel-info/?client_key=<uuid>
@@ -131,6 +150,7 @@ class SessionInitView(APIView):
                 channel=channel,
                 anonymous_id=anonymous_id,
             )
+            _broadcast_new_customer(customer)
 
         return Response({
             'token': str(app_token.token),
