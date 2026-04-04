@@ -127,16 +127,18 @@ class AIReplyService:
         """
         Returns (ai_config, system_prompt, messages).
 
-        system_prompt = business system_prompt + live customer info block.
+        system_prompt = CHAT_SYSTEM_MSG filled with business + customer context.
         messages      = [{'role': 'user'|'model', 'content': '...'}]
         'model' role covers both agent and previous bot replies.
         """
         from ai_config.models import AIConfig
         from .models import Message
+        from integrations.ai_providers.bot_prompt import (
+            CHAT_SYSTEM_MSG, DEFAULT_LENGTH_INSTRUCTION, DEFAULT_BUSINESS_GUIDELINES,
+        )
 
         config = AIConfig.objects.get(business=customer.business)
 
-        # Append known customer details so the AI can personalise its replies
         info_lines = []
         if customer.name:
             info_lines.append(f'Name: {customer.name}')
@@ -144,11 +146,17 @@ class AIReplyService:
             info_lines.append(f'Phone: {customer.phone}')
         if customer.email:
             info_lines.append(f'Email: {customer.email}')
+        customer_details = '\n'.join(info_lines) or 'No details available.'
 
-        system_prompt = config.system_prompt or ''
-        if info_lines:
-            customer_block = 'Current customer:\n' + '\n'.join(info_lines)
-            system_prompt = f'{system_prompt}\n\n{customer_block}' if system_prompt else customer_block
+        system_prompt = CHAT_SYSTEM_MSG.format(
+            BOT_NAME='Assistant',
+            BUSINESS_NAME=customer.business.name,
+            CUSTOMER_DETAILS=customer_details,
+            BUSINESS_DETAILS=config.system_prompt or '',
+            KNOWLEDGE_BASE='',
+            LENGTH_INSTRUCTION=DEFAULT_LENGTH_INSTRUCTION,
+            BUSINESS_SPECIFIC_GUIDELINES=DEFAULT_BUSINESS_GUIDELINES,
+        )
 
         recent = list(
             Message.objects.filter(customer=customer)

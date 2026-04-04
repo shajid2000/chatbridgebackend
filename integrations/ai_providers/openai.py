@@ -25,7 +25,8 @@ class OpenAIProvider(AbstractAIProvider):
         openai_messages = []
 
         if system_prompt:
-            openai_messages.append({'role': 'system', 'content': system_prompt})
+            wrapped = system_prompt
+            openai_messages.append({'role': 'system', 'content': wrapped})
 
         for msg in messages:
             if msg.get('content', '').strip():
