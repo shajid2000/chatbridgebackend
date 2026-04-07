@@ -202,12 +202,12 @@ class AppMessagesView(APIView):
         app_token = request.user
         customer = app_token.customer
 
-        qs = Message.objects.filter(customer=customer).order_by('-timestamp')
+        qs = Message.objects.filter(customer=customer, channel="app").order_by('-timestamp')
 
         before_id = request.query_params.get('before')
         if before_id:
             try:
-                pivot = Message.objects.get(id=before_id, customer=customer)
+                pivot = Message.objects.get(id=before_id, customer=customer, channel="app")
                 qs = qs.filter(timestamp__lt=pivot.timestamp)
             except Message.DoesNotExist:
                 pass
