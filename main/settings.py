@@ -51,11 +51,17 @@ MIDDLEWARE = [
 # ───────────────────────────────────────────
 # CORS
 # ───────────────────────────────────────────
+# /api/app/* is the public widget API — must work from any business website.
+# Auth is handled by X-App-Token, so opening CORS here is safe.
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
     default='http://localhost:3000'
 ).split(',')
 CORS_ALLOW_CREDENTIALS = True
+
+# Allow all origins for the embeddable widget endpoints only.
+CORS_URLS_REGEX = r'^/api/app/.*$'
+CORS_ALLOW_ALL_ORIGINS = False
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "x-app-token",

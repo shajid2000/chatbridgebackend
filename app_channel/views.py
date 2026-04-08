@@ -18,6 +18,7 @@ from .serializers import (
     SessionInitSerializer,
     SessionUpdateSerializer,
 )
+from .utility import handle_demo_prerequisite
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,10 @@ class SessionInitView(APIView):
             return Response(serializer.errors, status=400)
 
         data = serializer.validated_data
+        is_demo = bool(data.get('demo_auth_key'))
+
+        if is_demo:
+            handle_demo_prerequisite(data)
 
         # Resolve the app channel
         try:
@@ -132,6 +137,9 @@ class SessionInitView(APIView):
             if updated_fields:
                 updated_fields.append('updated_at')
                 customer.save(update_fields=updated_fields)
+
+            if is_demo:
+                Message.objects.filter(customer=customer, channel_type="app").order_by('-timestamp').delete()
         else:
             # New client — create Customer + CustomerChannel + AppToken
             customer = Customer.objects.create(
@@ -202,7 +210,7 @@ class AppMessagesView(APIView):
         app_token = request.user
         customer = app_token.customer
 
-        qs = Message.objects.filter(customer=customer, channel="app").order_by('-timestamp')
+        qs = Message.objects.filter(customer=customer, channel_type="app").order_by('-timestamp')
 
         before_id = request.query_params.get('before')
         if before_id:

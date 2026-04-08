@@ -17,6 +17,8 @@ class SessionInitSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
     email = serializers.EmailField(required=False, allow_blank=True, default='')
     phone = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
+    demo_auth_key=serializers.CharField(max_length=255, required=False)
+    ai_config = serializers.JSONField(required=False, help_text='Optional AI config to override business defaults for this session.')
 
 
 class SessionUpdateSerializer(serializers.Serializer):
