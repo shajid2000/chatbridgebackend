@@ -60,7 +60,7 @@ CORS_ALLOWED_ORIGINS = config(
 CORS_ALLOW_CREDENTIALS = True
 
 # Allow all origins for the embeddable widget endpoints only.
-CORS_URLS_REGEX = r'^/api/app/.*$'
+# CORS_URLS_REGEX = r'^/api/app/.*$'
 # CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_ALL_ORIGINS = True
 

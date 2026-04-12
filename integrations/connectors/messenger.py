@@ -69,9 +69,9 @@ class MessengerConnector(BaseConnector):
     # ── PATCH ─────────────────────────────────────────────────────────────────
 
     def assign(self, request, connection, item: dict):
-        connection.page_id    = item.get('page_id',    '')
-        connection.page_name  = item.get('page_name',  '')
-        connection.page_token = item.get('page_token', '')
+        connection.page_id = item.get('page_id') or item.get('id', '')
+        connection.page_name = item.get('page_name') or item.get('name', '')
+        connection.page_token = item.get('page_token') or item.get('access_token', '')
         self._apply_page(connection, item, connection.access_token)
         return Response(SourceConnectionSerializer(connection).data)
 

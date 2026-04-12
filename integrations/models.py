@@ -57,13 +57,14 @@ class Channel(models.Model):
 
 class SourceConnection(models.Model):
     """
-    OAuth-based connection to a Meta messaging source (Messenger or WhatsApp).
+    OAuth-based connection to a Meta messaging source (Messenger, Instagram, or WhatsApp).
     One connection per business per source. Stores all Meta tokens and business metadata.
     After connection is finalized this syncs into the Channel model for webhook routing.
     """
 
     class SourceType(models.TextChoices):
         MESSENGER = 'facebook.com', 'Facebook Messenger'
+        INSTAGRAM = 'instagram',    'Instagram Messaging'
         WHATSAPP  = 'whatsapp',     'WhatsApp Business'
 
     id       = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

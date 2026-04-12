@@ -1,83 +1,95 @@
 """
-SourceConnectionService — Meta OAuth connect/disconnect flow.
+Source connection helpers for OAuth-based integrations.
 
 Supports:
-  - Facebook Messenger (source = 'facebook.com')
-  - WhatsApp Business (source = 'whatsapp')
-
-Flow:
-  Phase A  →  get_login_url(source)     →  returns Meta OAuth URL for frontend to open
-  Phase B  →  finalize_*(business, ...)  →  exchange code, discover pages/WABA, persist
+  - Facebook Messenger via Facebook Login
+  - Instagram Messaging via Instagram Login for Business
+  - WhatsApp Business via Meta Embedded Signup
 """
 import logging
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
 import requests
 from decouple import config
 
 logger = logging.getLogger(__name__)
 
-GRAPH   = config('FACEBOOK_BASE_API_URI', default='https://graph.facebook.com/v19.0')
-TIMEOUT = 10  # seconds for all Meta API calls
+GRAPH = config('FACEBOOK_BASE_API_URI', default='https://graph.facebook.com/v19.0')
+INSTAGRAM_GRAPH = config('INSTAGRAM_GRAPH_API_URI', default='https://graph.instagram.com')
+INSTAGRAM_AUTH_BASE = config('INSTAGRAM_AUTH_BASE_URI', default='https://www.instagram.com/oauth/authorize')
+INSTAGRAM_OAUTH_BASE = config('INSTAGRAM_OAUTH_BASE_URI', default='https://api.instagram.com/oauth')
+TIMEOUT = 10
 
 # Permissions we keep when revoking Messenger access
 _KEEP_PERMISSIONS = {'whatsapp_business_management', 'whatsapp_business_messaging', 'public_profile'}
 
 
 class MetaAPIError(Exception):
-    """Raised when a Meta Graph API call returns an error."""
+    """Raised when a remote OAuth/Graph request returns an error."""
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Login URL generation
-# ─────────────────────────────────────────────────────────────────────────────
 
 def get_login_url(source: str, state: str = '') -> str:
     """
-    Return a Meta OAuth URL that opens the Embedded Signup / Login dialog.
-    source = 'facebook.com' → uses FACEBOOK_CONFIG_ID
-    source = 'whatsapp'     → uses WHATSAPP_FACEBOOK_CONFIG_ID
+    Return the login URL for the selected source.
     """
     if source == 'facebook.com':
-        config_id = config('FACEBOOK_CONFIG_ID', default='')
-    elif source == 'whatsapp':
-        config_id = config('WHATSAPP_FACEBOOK_CONFIG_ID', default='')
-    else:
-        raise ValueError(f"Unsupported source: {source}")
+        params = {
+            'client_id': config('FACEBOOK_APP_ID', default=''),
+            'config_id': config('FACEBOOK_CONFIG_ID', default=''),
+            'redirect_uri': config('FACEBOOK_REDIRECT_URI', default=''),
+            'response_type': 'code',
+            'state': state,
+        }
+        qs = '&'.join(f"{k}={v}" for k, v in params.items() if v)
+        return f"https://www.facebook.com/dialog/oauth?{qs}"
 
-    params = {
-        'client_id':     config('FACEBOOK_APP_ID', default=''),
-        'config_id':     config_id,
-        'redirect_uri':  config('FACEBOOK_REDIRECT_URI', default=''),
-        'response_type': 'code',
-        'state':         state,
-    }
-    qs = '&'.join(f"{k}={v}" for k, v in params.items() if v)
-    return f"https://www.facebook.com/dialog/oauth?{qs}"
+    if source == 'whatsapp':
+        params = {
+            'client_id': config('FACEBOOK_APP_ID', default=''),
+            'config_id': config('WHATSAPP_FACEBOOK_CONFIG_ID', default=''),
+            'redirect_uri': config('FACEBOOK_REDIRECT_URI', default=''),
+            'response_type': 'code',
+            'state': state,
+        }
+        qs = '&'.join(f"{k}={v}" for k, v in params.items() if v)
+        return f"https://www.facebook.com/dialog/oauth?{qs}"
 
+    if source == 'instagram':
+        params = {
+            'client_id': config('INSTAGRAM_APP_ID', default=config('FACEBOOK_APP_ID', default='')),
+            'redirect_uri': config('INSTAGRAM_REDIRECT_URI', default=config('FACEBOOK_REDIRECT_URI', default='')),
+            'response_type': 'code',
+            'scope': config(
+                'INSTAGRAM_LOGIN_SCOPES',
+                default='instagram_business_basic,instagram_business_manage_messages',
+            ),
+            'state': state,
+            'enable_fb_login': config('INSTAGRAM_ENABLE_FB_LOGIN', default='0'),
+        }
+        qs = '&'.join(f"{k}={v}" for k, v in params.items() if v != '')
+        return f"{INSTAGRAM_AUTH_BASE}?{qs}"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Token exchange (shared)
-# ─────────────────────────────────────────────────────────────────────────────
+    raise ValueError(f"Unsupported source: {source}")
+
 
 def parse_code_from_url(auth_code_url: str) -> str:
-    """auth_code is the full redirect URL; extract the `code` query param."""
+    """Extract the authorization code from the full callback URL."""
     parsed = urlparse(auth_code_url)
     code_list = parse_qs(parsed.query).get('code', [])
     if not code_list:
         raise ValueError("No 'code' found in auth_code URL.")
-    return code_list[0]
+    return code_list[0].replace('#_', '')
 
 
 def exchange_code_for_token(code: str) -> str:
-    """Exchange a short-lived code for a user access token."""
+    """Exchange a Facebook/Meta code for a user access token."""
     resp = requests.get(
         f"{GRAPH}/oauth/access_token",
         params={
-            'client_id':     config('FACEBOOK_APP_ID',     default=''),
-            'redirect_uri':  config('FACEBOOK_REDIRECT_URI', default=''),
+            'client_id': config('FACEBOOK_APP_ID', default=''),
+            'redirect_uri': config('FACEBOOK_REDIRECT_URI', default=''),
             'client_secret': config('FACEBOOK_APP_SECRET', default=''),
-            'code':          code,
+            'code': code,
         },
         timeout=TIMEOUT,
     )
@@ -88,12 +100,83 @@ def exchange_code_for_token(code: str) -> str:
     return data['access_token']
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Messenger helpers
-# ─────────────────────────────────────────────────────────────────────────────
+def exchange_instagram_code_for_token(code: str) -> dict:
+    """Exchange an Instagram authorization code for a short-lived token."""
+    resp = requests.post(
+        f"{INSTAGRAM_OAUTH_BASE}/access_token",
+        data={
+            'client_id': config('INSTAGRAM_APP_ID', default=config('FACEBOOK_APP_ID', default='')),
+            'client_secret': config('INSTAGRAM_APP_SECRET', default=config('FACEBOOK_APP_SECRET', default='')),
+            'grant_type': 'authorization_code',
+            'redirect_uri': config('INSTAGRAM_REDIRECT_URI', default=config('FACEBOOK_REDIRECT_URI', default='')),
+            'code': code,
+        },
+        timeout=TIMEOUT,
+    )
+    data = resp.json()
+    if 'error' in data or 'error_message' in data or 'error_type' in data:
+        logger.error("Instagram token exchange error: %s", data)
+        raise MetaAPIError(
+            data.get('error_message')
+            or data.get('error', {}).get('message')
+            or 'Instagram token exchange failed'
+        )
+
+    payload = data.get('data', [{}])[0] if isinstance(data.get('data'), list) else data
+    if not payload.get('access_token'):
+        logger.error("Instagram token exchange missing access token: %s", data)
+        raise MetaAPIError('Instagram token exchange failed')
+    return payload
+
+
+def exchange_instagram_for_long_lived_token(short_lived_token: str) -> dict:
+    """Exchange a short-lived Instagram token for a long-lived token."""
+    resp = requests.get(
+        f"{INSTAGRAM_GRAPH}/access_token",
+        params={
+            'grant_type': 'ig_exchange_token',
+            'client_secret': config(
+                'INSTAGRAM_APP_SECRET',
+                default=config('FACEBOOK_APP_SECRET', default=''),
+            ),
+            'access_token': short_lived_token,
+        },
+        timeout=TIMEOUT,
+    )
+    data = resp.json()
+    if 'error' in data:
+        logger.error("Instagram long-lived token exchange error: %s", data)
+        raise MetaAPIError(data['error'].get('message', 'Failed to get long-lived Instagram token'))
+    if not data.get('access_token'):
+        logger.error("Instagram long-lived token response missing access token: %s", data)
+        raise MetaAPIError('Failed to get long-lived Instagram token')
+    return data
+
+
+def get_instagram_user_profile(access_token: str) -> dict:
+    """
+    Fetch the logged-in Instagram professional account profile.
+
+    We keep the field set intentionally small because Instagram Login returns an
+    Instagram-scoped user identity directly rather than a Facebook Page.
+    """
+    resp = requests.get(
+        f"{INSTAGRAM_GRAPH}/me",
+        params={
+            'fields': 'user_id,username,name,profile_picture_url',
+            'access_token': access_token,
+        },
+        timeout=TIMEOUT,
+    )
+    data = resp.json()
+    if 'error' in data:
+        logger.error("get_instagram_user_profile error: %s", data)
+        raise MetaAPIError(data['error'].get('message', 'Failed to fetch Instagram profile'))
+    return data
+
 
 def get_facebook_pages(access_token: str) -> list:
-    """Return list of Facebook Pages the user manages."""
+    """Return the Facebook Pages the user manages."""
     resp = requests.get(
         f"{GRAPH}/me/accounts",
         params={'access_token': access_token},
@@ -107,7 +190,7 @@ def get_facebook_pages(access_token: str) -> list:
 
 
 def subscribe_messenger_page(page_token: str):
-    """Subscribe a page to the required webhook fields."""
+    """Subscribe a page to Messenger webhook fields."""
     resp = requests.post(
         f"{GRAPH}/me/subscribed_apps",
         params={'access_token': page_token},
@@ -134,14 +217,10 @@ def get_page_metadata(page_id: str, access_token: str) -> dict:
     return data
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# WhatsApp helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
 def get_waba_id(access_token: str) -> str | None:
     """
-    Use debug_token to inspect granular_scopes and find the WABA id
-    granted under whatsapp_business_management.
+    Inspect granular scopes and find the WABA id granted under
+    whatsapp_business_management.
     """
     admin_token = config('FACEBOOK_APP_ADMIN_TOKEN', default='')
     resp = requests.get(
@@ -155,8 +234,7 @@ def get_waba_id(access_token: str) -> str | None:
         logger.error("debug_token error: %s", data)
         raise MetaAPIError(data['error'].get('message', 'Failed to inspect access token'))
 
-    granular_scopes = data.get('data', {}).get('granular_scopes', [])
-    for scope_obj in granular_scopes:
+    for scope_obj in data.get('data', {}).get('granular_scopes', []):
         if scope_obj.get('scope') == 'whatsapp_business_management':
             target_ids = scope_obj.get('target_ids', [])
             if target_ids:
@@ -178,7 +256,7 @@ def subscribe_waba_to_app(waba_id: str):
 
 
 def unsubscribe_waba_from_app(waba_id: str):
-    """Unsubscribe the app from a WABA's webhooks (called on disconnect)."""
+    """Unsubscribe the app from a WABA's webhooks."""
     admin_token = config('FACEBOOK_ADMIN_TOKEN', default='')
     resp = requests.delete(
         f"{GRAPH}/{waba_id}/subscribed_apps",
@@ -219,12 +297,8 @@ def get_waba_metadata(waba_id: str, access_token: str) -> dict:
     return data
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Permission revocation (used on Messenger disconnect)
-# ─────────────────────────────────────────────────────────────────────────────
-
 def revoke_facebook_permissions(access_token: str):
-    """Revoke all granted permissions except those needed for WhatsApp."""
+    """Revoke all granted Facebook permissions except those needed for WhatsApp."""
     resp = requests.get(
         f"{GRAPH}/me/permissions",
         params={'access_token': access_token},
@@ -237,53 +311,3 @@ def revoke_facebook_permissions(access_token: str):
                 params={'access_token': access_token},
                 timeout=TIMEOUT,
             )
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Channel sync helpers (keep Channel model in sync after connect)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def sync_messenger_channel(connection):
-    """Create or update the Channel record for a finalized Messenger connection."""
-    from .models import Channel, ChannelType
-    ch_type = ChannelType.objects.filter(key='messenger').first()
-    if not ch_type or not connection.page_id:
-        return
-    Channel.objects.update_or_create(
-        business=connection.business,
-        channel_type=ch_type,
-        page_id=connection.page_id,
-        defaults={
-            'name':         connection.page_name or 'Messenger',
-            'access_token': connection.page_token,
-            'status':       Channel.Status.ACTIVE,
-        },
-    )
-
-
-def sync_whatsapp_channel(connection, phone_number_id: str, display_phone: str, access_token: str):
-    """Create or update the Channel record for a finalized WhatsApp connection."""
-    from .models import Channel, ChannelType
-    ch_type = ChannelType.objects.filter(key='whatsapp').first()
-    if not ch_type or not phone_number_id:
-        return
-    Channel.objects.update_or_create(
-        business=connection.business,
-        channel_type=ch_type,
-        defaults={
-            'name':            f"WhatsApp {display_phone}".strip(),
-            'access_token':    access_token,
-            'phone_number_id': phone_number_id,
-            'status':          Channel.Status.ACTIVE,
-        },
-    )
-
-
-def deactivate_channel(business, channel_type_key: str):
-    """Mark the Channel as inactive on disconnect."""
-    from .models import Channel, ChannelType
-    ch_type = ChannelType.objects.filter(key=channel_type_key).first()
-    if ch_type:
-        Channel.objects.filter(business=business, channel_type=ch_type).update(
-            status=Channel.Status.INACTIVE
-        )

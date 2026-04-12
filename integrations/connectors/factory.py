@@ -7,6 +7,7 @@ To add a new platform:
   3. Done — views and URLs need no changes.
 """
 from .messenger import MessengerConnector
+from .instagram import InstagramConnector
 from .whatsapp  import WhatsAppConnector
 
 
@@ -15,6 +16,7 @@ class ConnectorFactory:
         connector.source_key: connector
         for connector in [
             MessengerConnector(),
+            InstagramConnector(),
             WhatsAppConnector(),
             # TelegramConnector(),   ← future: just uncomment
             # LineConnector(),
