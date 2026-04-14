@@ -8,6 +8,9 @@ from integrations.models import SourceConnection
 from integrations.serializers import SourceConnectionSerializer
 from .base import BaseConnector
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class InstagramConnector(BaseConnector):
     source_key = 'instagram'
@@ -29,6 +32,8 @@ class InstagramConnector(BaseConnector):
         instagram_user_id = str(profile.get('user_id') or profile.get('id') or short_lived.get('user_id') or '')
         if not instagram_user_id:
             return Response({'detail': 'Instagram profile ID was not returned by the login flow.'}, status=406)
+        
+        api.subscribe_instagram_page(long_lived['access_token'])
 
         conn, _ = SourceConnection.objects.update_or_create(
             business=business,
@@ -73,5 +78,13 @@ class InstagramConnector(BaseConnector):
         return Response({'detail': 'Instagram Login connections are finalized during OAuth.'}, status=405)
 
     def disconnect(self, connection):
+        if connection.page_id:
+            try:
+                api.unsubscribe_instagram_page(connection.page_token)
+            except Exception:
+                logger.warning(
+                    'Instagram webhook unsubscribe failed for connection %s (waba_id=%s)',
+                    connection.id, connection.page_id,
+                )
         self._deactivate_channel(connection.business, 'instagram')
         connection.delete()

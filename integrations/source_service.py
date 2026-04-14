@@ -174,6 +174,31 @@ def get_instagram_user_profile(access_token: str) -> dict:
         raise MetaAPIError(data['error'].get('message', 'Failed to fetch Instagram profile'))
     return data
 
+def subscribe_instagram_page(page_token: str):
+    """Subscribe a page to Instagram webhook fields."""
+    resp = requests.post(
+        f"{INSTAGRAM_GRAPH}/me/subscribed_apps",
+        params={'access_token': page_token},
+        data={},
+        timeout=TIMEOUT,
+    )
+    data = resp.json()
+    if not data.get('success'):
+        logger.warning("Instagram page subscription non-success: %s", data)
+
+
+def unsubscribe_instagram_page(page_token: str):
+    """Unsubscribe a page from Instagram webhook fields."""
+    resp = requests.delete(
+        f"{INSTAGRAM_GRAPH}/me/subscribed_apps",
+        params={'access_token': page_token},
+        data={},
+        timeout=TIMEOUT,
+    )
+    data = resp.json()
+    if not data.get('success'):
+        logger.warning("Instagram page subscription non-success: %s", data)
+
 
 def get_facebook_pages(access_token: str) -> list:
     """Return the Facebook Pages the user manages."""

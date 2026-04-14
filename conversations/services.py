@@ -54,6 +54,10 @@ class MessageProcessor:
             phone=phone,
         )
 
+        # Enrich customer profile from Instagram if we don't have one yet
+        if channel_type == 'instagram' and not customer.avatar_url:
+            MessageProcessor._enrich_from_instagram(customer, sender_external_id, channel)
+
         # Update last seen channel
         customer.last_channel = channel
         customer.last_message_at = timezone.now()
@@ -160,6 +164,49 @@ class MessageProcessor:
             external_id=sender_external_id,
         )
         return customer, True
+
+    @staticmethod
+    def _enrich_from_instagram(customer, ig_scoped_id: str, channel):
+        """
+        Fetch Instagram user profile and save to customer.
+        - name       → customer.name  (only if still a Guest placeholder)
+        - profile_pic → customer.avatar_url
+        - remaining keys → customer.extra_fields
+        Silently skips if the API call fails or the channel has no access token.
+        """
+        if not channel.access_token:
+            return
+
+        from integrations.services import fetch_instagram_profile
+        profile = fetch_instagram_profile(ig_scoped_id, channel.access_token)
+        if not profile:
+            return
+
+        update_fields = []
+
+        # Replace Guest placeholder names with the real Instagram name
+        ig_name = profile.pop('name', None)
+        if ig_name and customer.name.startswith('Guest #'):
+            customer.name = ig_name
+            update_fields.append('name')
+
+        ig_pic = profile.pop('profile_pic', None)
+        if ig_pic:
+            customer.avatar_url = ig_pic
+            update_fields.append('avatar_url')
+
+        # Drop the redundant 'id' field (same as ig_scoped_id)
+        profile.pop('id', None)
+
+        # Merge remaining keys into extra_fields
+        if profile:
+            customer.extra_fields = {**customer.extra_fields, **profile}
+            update_fields.append('extra_fields')
+
+        if update_fields:
+            update_fields.append('updated_at')
+            customer.save(update_fields=update_fields)
+            logger.info('Enriched customer %s from Instagram profile', customer.id)
 
     @staticmethod
     def _map_content_type(platform_type: str) -> str:

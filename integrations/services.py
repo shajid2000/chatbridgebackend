@@ -1,8 +1,45 @@
 import hashlib
 import hmac
 import json
+import logging
+import requests
 from accounts.models import Business
 from .models import Channel, ChannelType
+from .source_service import INSTAGRAM_GRAPH
+
+logger = logging.getLogger(__name__)
+
+# Shared with the Instagram adapter — keep in sync
+INSTAGRAM_API_VERSION = 'v25.0'
+
+
+def fetch_instagram_profile(ig_scoped_id: str, access_token: str) -> dict:
+    """
+    Fetch the public profile of an Instagram user by their IG-scoped ID.
+
+    API: GET https://graph.instagram.com/{version}/{ig_scoped_id}
+         ?fields=name,username,profile_pic,follower_count,is_verified_user,
+                 is_user_follow_business,is_business_follow_user
+         &access_token={page_access_token}
+
+    Returns the full API response dict on success, or {} on failure.
+    """
+    url = f'{INSTAGRAM_GRAPH}/{INSTAGRAM_API_VERSION}/{ig_scoped_id}'
+    fields = (
+        'name,username,profile_pic,follower_count,'
+        'is_verified_user,is_user_follow_business,is_business_follow_user'
+    )
+    try:
+        resp = requests.get(
+            url,
+            params={'fields': fields, 'access_token': access_token},
+            timeout=5,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as exc:
+        logger.warning('fetch_instagram_profile failed for %s: %s', ig_scoped_id, exc)
+        return {}
 
 
 class ChannelService:

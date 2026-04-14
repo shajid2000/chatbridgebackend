@@ -14,7 +14,7 @@ class Customer(models.Model):
     name = models.CharField(max_length=255, blank=True)
     phone = models.CharField(max_length=50, blank=True)
     email = models.EmailField(blank=True)
-    avatar_url = models.URLField(blank=True)
+    avatar_url = models.URLField(max_length=1000, blank=True)
     # Last channel used — default for replies
     last_channel = models.ForeignKey(
         Channel, on_delete=models.SET_NULL, null=True, blank=True, related_name='+'
@@ -23,6 +23,8 @@ class Customer(models.Model):
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_customers'
     )
     last_message_at = models.DateTimeField(null=True, blank=True)
+    # Stores raw platform profile data (e.g. Instagram username, follower_count, verification status)
+    extra_fields = models.JSONField(default=dict, blank=True)
     # None = follow business AI setting, True = force on, False = opt-out
     ai_enabled = models.BooleanField(null=True, blank=True, default=None)
     status = models.CharField(
