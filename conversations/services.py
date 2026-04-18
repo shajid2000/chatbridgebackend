@@ -277,9 +277,21 @@ class ReplyService:
         try:
             adapter = AdapterFactory.get(channel)
             if message.content_type == Message.ContentType.TEXT:
-                adapter.send_message(customer, message, channel)
+                resp = adapter.send_message(customer, message, channel)
             else:
-                adapter.send_media(customer, message, channel)
+                resp = adapter.send_media(customer, message, channel)
+            # Save platform message ID so read receipts can be matched later
+            # WhatsApp: {"messages": [{"id": "wamid..."}]}
+            # Instagram / Messenger: {"message_id": "..."}
+            r = resp or {}
+            channel_key = channel.channel_type.key
+            if channel_key == 'whatsapp':
+                platform_mid = (r.get('messages') or [{}])[0].get('id')
+            else:
+                platform_mid = r.get('message_id')
+            if platform_mid:
+                message.external_id = platform_mid
+                message.save(update_fields=['external_id'])
         except Exception as e:
             logger.exception(
                 'Adapter dispatch failed for message %s via %s: %s',

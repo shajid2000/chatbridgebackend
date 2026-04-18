@@ -143,8 +143,34 @@ class MetaWebhookView(APIView):
             # if not WebhookVerifier.verify_meta(raw_body, signature, channel.webhook_secret):
             #     logger.warning('Invalid Instagram signature for channel %s', channel.id)
             #     continue
-            messages = MessageNormalizer.from_instagram(payload)
-            self._dispatch(messages, channel)
+
+            for event in entry.get('messaging', []):
+                # Read receipt — customer read a message we sent
+                if 'read' in event:
+                    mid = event['read'].get('mid')
+                    if mid:
+                        self._mark_instagram_read([mid], channel)
+                    continue
+
+                # Skip messages sent by our own account (echo flag or sender = our page)
+                if (event.get('message', {}).get('is_echo') or
+                        event.get('sender', {}).get('id') == channel.page_id):
+                    continue
+
+                # Inbound customer message
+                messages = MessageNormalizer.from_instagram({'entry': [{'id': page_id, 'messaging': [event]}]})
+                self._dispatch(messages, channel)
+
+    def _mark_instagram_read(self, mids: list, channel):
+        """Mark outbound messages as read when Instagram sends a read-receipt webhook."""
+        from conversations.models import Message
+        updated = Message.objects.filter(
+            external_id__in=mids,
+            customer__business=channel.business,
+            speaker__in=[Message.Speaker.AGENT, Message.Speaker.BOT],
+        ).exclude(is_read=True).update(is_read=True)
+        if updated:
+            logger.info('Marked %d Instagram message(s) as read via receipt', updated)
 
     def _handle_messenger(self, raw_body, signature, payload):
         for entry in payload.get('entry', []):

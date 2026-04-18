@@ -114,6 +114,7 @@ class MessageNormalizer:
         for entry in payload.get('entry', []):
             for event in entry.get('messaging', []):
                 msg = event.get('message', {})
+                # Skip echo events (sent by our own IG account) and non-message events (read receipts etc.)
                 messages.append({
                     'channel_type': 'instagram',
                     'external_id': msg.get('mid'),
