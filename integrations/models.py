@@ -90,6 +90,9 @@ class SourceConnection(models.Model):
     business_approved_status     = models.CharField(max_length=50,  blank=True)
     business_verification_status = models.CharField(max_length=50,  blank=True)
 
+    # Raw platform profile data (e.g. Instagram: user_id, username, name, profile_picture_url)
+    extra_fields = models.JSONField(default=dict, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

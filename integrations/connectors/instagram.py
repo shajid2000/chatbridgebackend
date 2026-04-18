@@ -53,6 +53,12 @@ class InstagramConnector(BaseConnector):
         conn.business_manager_name = ''
         conn.business_approved_status = ''
         conn.business_verification_status = ''
+        conn.extra_fields = {
+            'user_id': profile.get('user_id', ''),
+            'username': profile.get('username', ''),
+            'profile_picture_url': profile.get('profile_picture_url', ''),
+            'ig_id': profile.get('id', ''),
+        }
         conn.save()
 
         display_name = username or name or 'instagram'

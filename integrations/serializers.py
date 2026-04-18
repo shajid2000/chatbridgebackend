@@ -57,6 +57,8 @@ class SourceConnectionSerializer(serializers.ModelSerializer):
             # Business metadata
             'business_manager_id', 'business_manager_name',
             'business_approved_status', 'business_verification_status',
+            # Extra platform profile data (e.g. Instagram profile_picture_url, username)
+            'extra_fields',
             # Meta
             'connected_by', 'created_at', 'updated_at',
         ]
